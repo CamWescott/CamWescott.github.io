@@ -1,0 +1,159 @@
+---
+title: "bellabeat Case Study"
+author: "Cam Hotchkiss"
+date: "2023-11-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Business Case
+
+I was asked to analyze smart device usage data in order to gain insight into how consumers use non-Bellabeat smart
+devices. Then to select one Bellabeat product to apply these insights to in my presentation. The questions to guide the analysis were:
+
+* What are some trends in smart device usage?
+* How could these trends apply to Bellabeat customers?
+* How could these trends help influence Bellabeat marketing strategy?
+
+The Bellabeat devices are:
+
+* Bellabeat app
+* Leaf
+* Time
+* Spring
+* Bellabeat membership
+
+## Data
+
+The data for this case study comes from [FitBit Fitness Tracker Data](https://www.kaggle.com/datasets/arashnic/fitbit). This Kaggle data set contains personal fitness tracker from thirty fitbit users. Thirty eligible Fitbit users consented to the submission of
+personal tracker data, including minute-level output for physical activity, heart rate, and sleep monitoring. It includes
+information about daily activity, steps, and heart rate that can be used to explore users’ habits.
+
+## Preparing the environment and data
+
+First I loaded the 'tidyverse' library and imported the csv files from the downloaded data
+
+```{r loading tidyverse}
+library(tidyverse)
+```
+
+```{r importing data}
+daily_activity <- read.csv("../Portfolio/dailyActivity_merged.csv")
+sleep_day <- read.csv("../Portfolio/sleepDay_merged.csv")
+weightlog_info <- read.csv("../Portfolio/weightLogInfo_merged.csv")
+```
+
+## Processing / Cleaning the data
+
+Once imported I checked the structured of the data.
+
+```{r structure of daily activity}
+str(daily_activity)
+
+```
+
+```{r structure of sleep}
+str(sleep_day)
+
+```
+
+```{r structure of weight}
+str(weightlog_info)
+```
+
+Next I formatted the data to make them better align. This will make the process of joining them easier later. To clean the data I took the following steps:
+
+* Changed the ID variable from 'num' to 'char'.
+* Changed the date type to the same format as both the weight and sleep included a time element but daily activity did not.
+* Changed the label for the date to 'Day" to be the same for all data frames as it currently is 'ActivityDate', 'SleepDay' and 'Date'.
+
+```{r cleaning data}
+daily_activity <- daily_activity %>% 
+  mutate_at(vars(Id), as.character) %>% 
+  mutate_at(vars(ActivityDate), as.Date, format= "%m/%d/%y") %>% 
+  rename("Day" = "ActivityDate")
+sleep_day <- sleep_day %>% 
+  mutate_at(vars(Id), as.character) %>% 
+  mutate_at(vars(SleepDay), as.Date, format= "%m/%d/%y") %>% 
+  rename("Day" = "SleepDay")
+weightlog_info <- weightlog_info %>% 
+  mutate_at(vars(Id, LogId), as.character) %>% 
+  mutate_at(vars(Date), as.Date, format= "%m/%d/%y") %>% 
+  rename("Day" = "Date")
+```
+
+Once data has been cleaned, the tables were than joined to create one data frame. As part of the joining a new column was also created for day of the week. This will allow for better visualization of analysis of the data.
+
+```{r joined table}
+joined_data <- sleep_day %>% 
+  right_join(daily_activity, by= c("Id", "Day")) %>% 
+  left_join(weightlog_info, by= c("Id", "Day")) %>% 
+  mutate(Weekday = weekdays(as.Date(Day, "%m/%D/&y")))
+
+joined_data$Weekday <- factor(joined_data$Weekday, levels = c("Sunday", "Monday", "Tuesday", "Wednesday","Thursday","Friday", "Saturday"))
+
+str(joined_data)
+```
+
+
+## Visualizing the data
+
+Now we can derive insights from the data. For instance the most logged activity is during the weekends, with activity falling through out the work week with no data logged on Thursday and Friday. 
+
+```{r Logged activity by day, echo=FALSE}
+ggplot(data=joined_data, aes(x=Weekday, y=LoggedActivitiesDistance)) + 
+  geom_col(fill="blue")+
+  labs(title="Logged Acvtivity by Day", y="Logged Activity") 
+```
+
+We can also see that there is no dramatic change in total minutes asleep per day through out the week.
+
+```{r Total minutes asleep by day, echo=FALSE}
+ggplot(data=joined_data, aes(x=Weekday, y=TotalMinutesAsleep)) + 
+  geom_col(fill="purple")+
+  labs(title="Total Minutes Asleep by Day", y="Total Minutes Asleep") 
+```
+
+When looking at weight vs calorie consumption we can see no big difference in caloric consumption for users less than 175lbs. However from 175lbs and above we see a large shift in calories.This makes sense as weight gain is based on calories in vs calories out.
+
+```{r Calories vs weight, echo=FALSE}
+ggplot(joined_data) +
+  geom_point(mapping = aes(x=WeightPounds, y=Calories), na.rm=TRUE, color="green") +
+  labs(title="Calories vs Weight", x="Weight", y="Calories") 
+```
+
+When comparing weight vs total number of steps, we see that those users who weigh more are also walking more. This could show that those who are overweight are actively trying to get healthier. 
+
+```{r Weight vs steps, echo=FALSE}
+ggplot(joined_data) +
+  geom_point(mapping = aes(x=TotalSteps, y=WeightPounds), na.rm=TRUE, color="green") +
+  labs(title="Weight vs Total Steps", x="Steps", y="Weight") 
+```
+
+Comparing weight vs time sedentary also shows that the users who weigh more spend more time being sedentary. When coupled with the previous finding that users who weigh more also tend to have more daily steps it can be reasoned that while they may be sedentary for most of the day, they give them self a period of time of activity, such as the gym or a daily walk.  
+
+```{r Weight vs time sedentary,echo=FALSE}
+ggplot(joined_data) +
+  geom_point(mapping = aes(x=SedentaryMinutes, y=WeightPounds), na.rm=TRUE, color="green") +
+  labs(title="Weight vs Time Sedentary", x="Sedentary Minutes", y="Weight") 
+```
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+## Conclusion
+
+Based on the data we can draw the following conclusions:
+
+* The most logged activity is during the weekends. Activity falls through out the work week with no data logged on Thursday and Friday.
+* We can also see that there is no dramatic change in total minutes asleep per day through out the week.
+* When looking at weight vs calorie consumption we can see no big difference in caloric consumption for users weighing less than 175lbs. However for users above 175lbs we see a large shift in calories.This makes sense as weight gain is based on calories in vs calories out.
+* When comparing weight vs total number of steps, we see that those users who weigh more are also walking more. This could show that those who are overweight are actively trying to get healthier.
+* Comparing weight vs time sedentary also shows that the users who weigh more spend more time being sedentary. When coupled with the previous finding that users who weigh more also tend to have more daily steps it can be reasoned that while they may be sedentary for most of the day, they give them self a period of time of activity, such as the gym or a daily walk.
+
+#### How can this data be utilized for bellabeats?
+
+The Bellabeat membership gives users access to nutrition and health guidance. The data shows that users who weigh more eat more calories, but that they also are putting in more steps in shorter amount of times. This shows that those users are actively trying to better their health. By running a campaign focusing on the membership's calorie tracking as well as guided fitness activities Bellabeats can better appeal to the overweight market. Guided fitness activities capable of being done in short periods of time as well as the ability to track calories will give those users more control over their weight-loss journey. 
